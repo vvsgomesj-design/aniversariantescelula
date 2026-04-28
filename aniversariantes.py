@@ -5,8 +5,31 @@ import os
 from datetime import datetime
 import urllib.parse
 
-# 1. CONFIGURAÇÕES E ESTILOS
-st.set_page_config(page_title="Aniversariantes - Sonho Dourado", page_icon="🎉", layout="wide")
+# 1. CONFIGURAÇÕES E ESTILOS CUSTOMIZADOS (CSS)
+st.set_page_config(page_title="Sonho Dourado", page_icon="🎉", layout="wide")
+
+# CSS para aumentar as fontes e ajustar botões no celular
+st.markdown("""
+    <style>
+    .nome-membro {
+        font-size: 22px !important;
+        font-weight: bold;
+        margin-bottom: -5px;
+    }
+    .info-membro {
+        font-size: 18px !important;
+        color: #555;
+    }
+    .stButton button {
+        width: 100%;
+        padding: 5px;
+    }
+    /* Ajuste para botões ficarem mais próximos */
+    [data-testid="column"] {
+        padding: 0px 5px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(DIRETORIO_ATUAL, "membros_sonho_dourado.json")
@@ -17,7 +40,6 @@ MESES_MAP = {
     "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
 }
 
-# 2. FUNÇÕES DE APOIO
 def carregar_dados():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -42,100 +64,77 @@ def gerar_link_agenda(nome, data_br):
     link = f"https://www.google.com/calendar/render?action=TEMPLATE&text={urllib.parse.quote('🎂 Aniversário: ' + nome)}&dates={data_formatada}/{data_formatada}&recur=RRULE:FREQ=YEARLY&sf=true&output=xml"
     return link
 
-# Inicialização do Estado
 if 'df_membros' not in st.session_state:
     st.session_state.df_membros = carregar_dados()
 
-st.title("🎂 Aniversariantes - Sonho Dourado")
+st.title("🎂 Sonho Dourado")
 
-# --- 3. BLOCO DE NOVO CADASTRO (O que faltava) ---
-with st.expander("➕ Adicionar Novo Membro à Célula"):
+# --- CADASTRO ---
+with st.expander("➕ Novo Membro"):
     with st.form("novo_cadastro", clear_on_submit=True):
+        nome_n = st.text_input("Nome")
         c1, c2 = st.columns(2)
-        nome_n = c1.text_input("Nome Completo")
-        whats_n = c2.text_input("WhatsApp (com DDD)")
-        
-        c3, c4 = st.columns(2)
-        niver_n = c3.text_input("Data de Aniversário (Ex: 28/06)")
-        gen_n = c4.selectbox("Gênero", ["Feminino", "Masculino"])
-        
-        if st.form_submit_button("✨ Cadastrar na Lista"):
+        whats_n = c1.text_input("Zap")
+        niver_n = c2.text_input("Data (DD/MM)")
+        gen_n = st.selectbox("Gênero", ["Feminino", "Masculino"])
+        if st.form_submit_button("Cadastrar"):
             if nome_n and niver_n:
-                novo_membro = pd.DataFrame([{"Nome": nome_n, "WhatsApp": whats_n, "Aniversario": niver_n, "Genero": gen_n}])
-                st.session_state.df_membros = pd.concat([st.session_state.df_membros, novo_membro], ignore_index=True)
+                novo = pd.DataFrame([{"Nome": nome_n, "WhatsApp": whats_n, "Aniversario": niver_n, "Genero": gen_n}])
+                st.session_state.df_membros = pd.concat([st.session_state.df_membros, novo], ignore_index=True)
                 salvar_dados(st.session_state.df_membros)
-                st.success(f"✅ {nome_n} adicionado com sucesso!")
                 st.rerun()
-            else:
-                st.error("⚠️ Por favor, preencha pelo menos Nome e Data.")
 
-# --- 4. BANNER DE HOJE ---
-hoje = datetime.now().strftime("%d/%m")
-df_atual = st.session_state.df_membros
-niver_hoje = df_atual[df_atual['Aniversario'].str.strip() == hoje]
-
-if not niver_hoje.empty:
-    st.markdown("""<div style='background-color:#fef9e7;padding:20px;border-radius:15px;text-align:center;border:2px solid #f1c40f;'>
-                <h1 style='margin:0;'>🥳 ANIVERSARIANTES DE HOJE! 🎆</h1></div>""", unsafe_allow_html=True)
-    st.balloons()
-    for _, row in niver_hoje.iterrows():
-        cn, cw = st.columns([3, 1])
-        cn.subheader(f"✨ {row['Nome']}")
-        link_w = limpar_whatsapp(row['WhatsApp'])
-        if link_w: cw.link_button("📱 Parabenizar", link_w, use_container_width=True)
-st.divider()
-
-# --- 5. FILTROS ---
+# --- FILTROS ---
 st.sidebar.header("🔍 Filtros")
-f_nome = st.sidebar.text_input("Buscar por Nome")
-f_gen = st.sidebar.multiselect("Gênero", ["Masculino", "Feminino"], default=["Masculino", "Feminino"])
+f_nome = st.sidebar.text_input("Buscar Nome")
 escolha_mes = st.sidebar.selectbox("Mês", list(MESES_MAP.keys()))
 f_mes_num = MESES_MAP[escolha_mes]
 
-df_f = df_atual.copy()
+df_f = st.session_state.df_membros.copy()
 df_f = df_f[df_f['Nome'].str.contains(f_nome, case=False, na=False)]
-df_f = df_f[df_f['Genero'].isin(f_gen)]
 if f_mes_num != "Todos":
     df_f = df_f[df_f['Aniversario'].str.contains(f"/{f_mes_num}", na=False)]
 
-# --- 6. LISTA DE GESTÃO ---
-st.subheader(f"📋 Lista: {escolha_mes} ({len(df_f)} pessoas)")
+# --- LISTA ESTILIZADA ---
+st.subheader(f"📋 {escolha_mes}")
 
 for idx, row in df_f.iterrows():
     icone, cor = ("🧔‍♂️", "#3498db") if row['Genero'] == "Masculino" else ("👗", "#e91e63")
     
-    with st.container():
-        c1, c2, c3, c4, c5, c6 = st.columns([3, 3, 2, 2, 1, 1])
-        c1.write(f"**{row['Nome']}**")
-        c2.markdown(f"📅 {row['Aniversario']} | <span style='color:{cor}; font-weight:bold;'>{icone}</span>", unsafe_allow_html=True)
+    # Nome e Data com fontes grandes
+    st.markdown(f"<div class='nome-membro'>{row['Nome']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-membro'>📅 {row['Aniversario']} | <span style='color:{cor}'>{icone}</span></div>", unsafe_allow_html=True)
+    
+    # Botões Lado a Lado (4 colunas pequenas)
+    b1, b2, b3, b4 = st.columns([1, 1, 1, 1])
+    
+    l_a = gerar_link_agenda(row['Nome'], row['Aniversario'])
+    if l_a: b1.link_button("📅", l_a, help="Agenda")
+    
+    l_w = limpar_whatsapp(row['WhatsApp'])
+    if l_w: b2.link_button("📱", l_w, help="WhatsApp")
+    
+    if b3.button("📝", key=f"ed_{idx}"):
+        st.session_state.edit_idx = idx
+        st.rerun()
         
-        # Ações
-        l_a = gerar_link_agenda(row['Nome'], row['Aniversario'])
-        if l_a: c3.link_button("📅 Agenda", l_a, use_container_width=True)
-        
-        l_w = limpar_whatsapp(row['WhatsApp'])
-        if l_w: c4.link_button("📱 WhatsApp", l_w, use_container_width=True)
-        
-        if c5.button("📝", key=f"ed_{idx}"): st.session_state.edit_idx = idx
-        if c6.button("🗑️", key=f"del_{idx}"):
-            st.session_state.df_membros = st.session_state.df_membros.drop(idx).reset_index(drop=True)
-            salvar_dados(st.session_state.df_membros)
-            st.rerun()
-        st.divider()
+    if b4.button("🗑️", key=f"del_{idx}"):
+        st.session_state.df_membros = st.session_state.df_membros.drop(idx).reset_index(drop=True)
+        salvar_dados(st.session_state.df_membros)
+        st.rerun()
+    
+    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 7. MODAL DE EDIÇÃO ---
+# --- EDIÇÃO ---
 if 'edit_idx' in st.session_state:
     idx = st.session_state.edit_idx
     m = st.session_state.df_membros.iloc[idx]
     with st.form("edit_form"):
-        st.subheader(f"Editar: {m['Nome']}")
         en = st.text_input("Nome", m['Nome'])
-        ew = st.text_input("WhatsApp", m['WhatsApp'])
-        ea = st.text_input("Data (DD/MM)", m['Aniversario'])
+        ea = st.text_input("Data", m['Aniversario'])
         eg = st.selectbox("Gênero", ["Feminino", "Masculino"], index=0 if m['Genero'] == "Feminino" else 1)
-        if st.form_submit_button("Salvar Alterações"):
+        if st.form_submit_button("Salvar"):
             st.session_state.df_membros.at[idx, 'Nome'] = en
-            st.session_state.df_membros.at[idx, 'WhatsApp'] = ew
             st.session_state.df_membros.at[idx, 'Aniversario'] = ea
             st.session_state.df_membros.at[idx, 'Genero'] = eg
             salvar_dados(st.session_state.df_membros)
