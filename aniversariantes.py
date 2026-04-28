@@ -5,55 +5,20 @@ import os
 from datetime import datetime
 import urllib.parse
 
-# 1. CONFIGURAÇÕES E ESTILOS GIGANTES (CSS)
+# 1. CONFIGURAÇÕES E ESTILOS
 st.set_page_config(page_title="Sonho Dourado", page_icon="🎉", layout="wide")
 
 st.markdown("""
     <style>
-    /* Nome do Membro - Tamanho Extra Grande */
-    .nome-membro {
-        font-size: 28px !important;
-        font-weight: 800;
-        color: #1E1E1E;
-        margin-bottom: 2px;
-        line-height: 1.2;
-    }
-    /* Data e Gênero - Tamanho Grande */
-    .info-membro {
-        font-size: 22px !important;
-        color: #444;
-        margin-bottom: 10px;
-    }
-    /* Forçar botões lado a lado no celular */
-    .stButton button {
-        font-size: 20px !important;
-        padding: 10px 0px !important;
-        border-radius: 10px;
-    }
-    /* Remove espaçamentos inúteis entre colunas */
-    [data-testid="column"] {
-        width: 25% !important;
-        flex: 1 1 25% !important;
-        min-width: 50px !important;
-        padding: 0px 3px !important;
-    }
-    hr {
-        margin-top: 15px !important;
-        margin-bottom: 15px !important;
-        border: 0;
-        border-top: 2px solid #EEE;
-    }
+    .nome-membro { font-size: 24px !important; font-weight: bold; margin-bottom: -5px; }
+    .info-membro { font-size: 19px !important; color: #555; }
+    .banner-festa { background-color: #fef9e7; padding: 20px; border-radius: 15px; text-align: center; border: 2px solid #f1c40f; margin-bottom: 20px; }
+    .stButton button { width: 100%; padding: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(DIRETORIO_ATUAL, "membros_sonho_dourado.json")
-
-MESES_MAP = {
-    "Todos": "Todos", "Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
-    "Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
-    "Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12"
-}
 
 def carregar_dados():
     if os.path.exists(DB_FILE):
@@ -74,91 +39,69 @@ def limpar_whatsapp(numero):
 def gerar_link_agenda(nome, data_br):
     if not data_br or '/' not in data_br: return None
     dia, mes = data_br.split('/')
-    ano_atual = datetime.now().year
-    data_formatada = f"{ano_atual}{mes}{dia}"
-    link = f"https://www.google.com/calendar/render?action=TEMPLATE&text={urllib.parse.quote('🎂 ' + nome)}&dates={data_formatada}/{data_formatada}&recur=RRULE:FREQ=YEARLY&sf=true&output=xml"
-    return link
+    ano_at = datetime.now().year
+    dt = f"{ano_at}{mes}{dia}"
+    return f"https://www.google.com/calendar/render?action=TEMPLATE&text={urllib.parse.quote('🎂 Aniversário: '+nome)}&dates={dt}/{dt}&recur=RRULE:FREQ=YEARLY&sf=true&output=xml"
+
+def gerar_arquivo_ics(df):
+    """Gera um arquivo para importar todos de uma vez"""
+    ics_content = "BEGIN:VCALENDAR\nVERSION:2.0\n"
+    ano_at = datetime.now().year
+    for _, r in df.iterrows():
+        if r['Aniversario'] and '/' in r['Aniversario']:
+            d, m = r['Aniversario'].split('/')
+            ics_content += f"BEGIN:VEVENT\nSUMMARY:🎂 Aniversário {r['Nome']}\nDTSTART:{ano_at}{m}{d}\nRRULE:FREQ=YEARLY\nEND:VEVENT\n"
+    ics_content += "END:VCALENDAR"
+    return ics_content
 
 if 'df_membros' not in st.session_state:
     st.session_state.df_membros = carregar_dados()
 
-st.title("🎂 Sonho Dourado")
+st.title("🎉 Sonho Dourado")
 
-# --- CADASTRO ---
-with st.expander("➕ Adicionar Pessoa"):
-    with st.form("novo_cadastro", clear_on_submit=True):
-        nome_n = st.text_input("Nome")
-        whats_n = st.text_input("WhatsApp")
-        niver_n = st.text_input("Aniversário (Ex: 28/06)")
-        gen_n = st.selectbox("Gênero", ["Feminino", "Masculino"])
-        if st.form_submit_button("Cadastrar"):
-            if nome_n and niver_n:
-                novo = pd.DataFrame([{"Nome": nome_n, "WhatsApp": whats_n, "Aniversario": niver_n, "Genero": gen_n}])
-                st.session_state.df_membros = pd.concat([st.session_state.df_membros, novo], ignore_index=True)
-                salvar_dados(st.session_state.df_membros)
-                st.rerun()
+# --- BANNER DE HOJE ---
+hoje = datetime.now().strftime("%d/%m")
+df_at = st.session_state.df_membros
+niver_hoje = df_at[df_at['Aniversario'].str.strip() == hoje]
 
-# --- FILTROS ---
-st.sidebar.header("🔍 Filtros")
-f_nome = st.sidebar.text_input("Buscar Nome")
-escolha_mes = st.sidebar.selectbox("Mês", list(MESES_MAP.keys()))
-f_mes_num = MESES_MAP[escolha_mes]
+if not niver_hoje.empty:
+    st.markdown('<div class="banner-festa"><h1>🥳 HOJE TEM FESTA!</h1></div>', unsafe_allow_html=True)
+    st.balloons()
+    for _, row in niver_hoje.iterrows():
+        c_n, c_w = st.columns([2, 1])
+        c_n.markdown(f"### ✨ {row['Nome']}")
+        lw = limpar_whatsapp(row['WhatsApp'])
+        if lw: c_w.link_button("📱 Parabéns", lw)
+    st.divider()
 
-df_f = st.session_state.df_membros.copy()
-df_f = df_f[df_f['Nome'].str.contains(f_nome, case=False, na=False)]
-if f_mes_num != "Todos":
-    df_f = df_f[df_f['Aniversario'].str.contains(f"/{f_mes_num}", na=False)]
-
-# --- LISTA SUPER LEGÍVEL ---
-st.subheader(f"📋 {escolha_mes}")
-
-for idx, row in df_f.iterrows():
-    icone, cor = ("🧔‍♂️", "#3498db") if row['Genero'] == "Masculino" else ("👗", "#e91e63")
-    
-    # Nome GIGANTE
+# --- LISTA ---
+st.subheader("📋 Lista de Membros")
+for idx, row in df_at.iterrows():
+    ic, cor = ("🧔‍♂️", "#3498db") if row['Genero'] == "Masculino" else ("👗", "#e91e63")
     st.markdown(f"<div class='nome-membro'>{row['Nome']}</div>", unsafe_allow_html=True)
-    # Data e Ícone Grandes
-    st.markdown(f"<div class='info-membro'>📅 {row['Aniversario']} | <span style='color:{cor}'>{icone}</span></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-membro'>📅 {row['Aniversario']} | <span style='color:{cor}'>{ic}</span></div>", unsafe_allow_html=True)
     
-    # Botões na mesma linha (4 colunas)
     b1, b2, b3, b4 = st.columns(4)
-    
-    # WhatsApp
-    l_w = limpar_whatsapp(row['WhatsApp'])
-    if l_w: b1.link_button("📱", l_w)
-    
-    # Agenda
-    l_a = gerar_link_agenda(row['Nome'], row['Aniversario'])
-    if l_a: b2.link_button("📅", l_a)
-    
-    # Editar
-    if b3.button("📝", key=f"ed_{idx}"):
-        st.session_state.edit_idx = idx
-        st.rerun()
-        
-    # Lixo
-    if b4.button("🗑️", key=f"del_{idx}"):
+    la = gerar_link_agenda(row['Nome'], row['Aniversario'])
+    if la: b1.link_button("📅", la)
+    lw = limpar_whatsapp(row['WhatsApp'])
+    if lw: b2.link_button("📱", lw)
+    if b3.button("📝", key=f"e_{idx}"): st.session_state.edit_idx = idx
+    if b4.button("🗑️", key=f"d_{idx}"):
         st.session_state.df_membros = st.session_state.df_membros.drop(idx).reset_index(drop=True)
         salvar_dados(st.session_state.df_membros)
         st.rerun()
-    
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.divider()
 
-# --- EDIÇÃO ---
-if 'edit_idx' in st.session_state:
-    idx = st.session_state.edit_idx
-    m = st.session_state.df_membros.iloc[idx]
-    with st.form("edit_form"):
-        st.write("### Editar Registro")
-        en = st.text_input("Nome", m['Nome'])
-        ew = st.text_input("WhatsApp", m['WhatsApp'])
-        ea = st.text_input("Data", m['Aniversario'])
-        eg = st.selectbox("Gênero", ["Feminino", "Masculino"], index=0 if m['Genero'] == "Feminino" else 1)
-        if st.form_submit_button("Salvar"):
-            st.session_state.df_membros.at[idx, 'Nome'] = en
-            st.session_state.df_membros.at[idx, 'WhatsApp'] = ew
-            st.session_state.df_membros.at[idx, 'Aniversario'] = ea
-            st.session_state.df_membros.at[idx, 'Genero'] = eg
-            salvar_dados(st.session_state.df_membros)
-            del st.session_state.edit_idx
-            st.rerun()
+# --- BOTÃO FINAL: TODOS NA AGENDA ---
+st.markdown("---")
+st.subheader("🚀 Configuração Rápida")
+st.write("Deseja colocar todos os aniversariantes na sua agenda de uma vez?")
+ics_data = gerar_arquivo_ics(df_at)
+st.download_button(
+    label="📥 Baixar todos para minha Agenda",
+    data=ics_data,
+    file_name="aniversarios_celula.ics",
+    mime="text/calendar",
+    use_container_width=True
+)
