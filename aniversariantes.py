@@ -5,28 +5,43 @@ import os
 from datetime import datetime
 import urllib.parse
 
-# 1. CONFIGURAÇÕES E ESTILOS CUSTOMIZADOS (CSS)
+# 1. CONFIGURAÇÕES E ESTILOS GIGANTES (CSS)
 st.set_page_config(page_title="Sonho Dourado", page_icon="🎉", layout="wide")
 
-# CSS para aumentar as fontes e ajustar botões no celular
 st.markdown("""
     <style>
+    /* Nome do Membro - Tamanho Extra Grande */
     .nome-membro {
-        font-size: 22px !important;
-        font-weight: bold;
-        margin-bottom: -5px;
+        font-size: 28px !important;
+        font-weight: 800;
+        color: #1E1E1E;
+        margin-bottom: 2px;
+        line-height: 1.2;
     }
+    /* Data e Gênero - Tamanho Grande */
     .info-membro {
-        font-size: 18px !important;
-        color: #555;
+        font-size: 22px !important;
+        color: #444;
+        margin-bottom: 10px;
     }
+    /* Forçar botões lado a lado no celular */
     .stButton button {
-        width: 100%;
-        padding: 5px;
+        font-size: 20px !important;
+        padding: 10px 0px !important;
+        border-radius: 10px;
     }
-    /* Ajuste para botões ficarem mais próximos */
+    /* Remove espaçamentos inúteis entre colunas */
     [data-testid="column"] {
-        padding: 0px 5px !important;
+        width: 25% !important;
+        flex: 1 1 25% !important;
+        min-width: 50px !important;
+        padding: 0px 3px !important;
+    }
+    hr {
+        margin-top: 15px !important;
+        margin-bottom: 15px !important;
+        border: 0;
+        border-top: 2px solid #EEE;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -61,7 +76,7 @@ def gerar_link_agenda(nome, data_br):
     dia, mes = data_br.split('/')
     ano_atual = datetime.now().year
     data_formatada = f"{ano_atual}{mes}{dia}"
-    link = f"https://www.google.com/calendar/render?action=TEMPLATE&text={urllib.parse.quote('🎂 Aniversário: ' + nome)}&dates={data_formatada}/{data_formatada}&recur=RRULE:FREQ=YEARLY&sf=true&output=xml"
+    link = f"https://www.google.com/calendar/render?action=TEMPLATE&text={urllib.parse.quote('🎂 ' + nome)}&dates={data_formatada}/{data_formatada}&recur=RRULE:FREQ=YEARLY&sf=true&output=xml"
     return link
 
 if 'df_membros' not in st.session_state:
@@ -70,12 +85,11 @@ if 'df_membros' not in st.session_state:
 st.title("🎂 Sonho Dourado")
 
 # --- CADASTRO ---
-with st.expander("➕ Novo Membro"):
+with st.expander("➕ Adicionar Pessoa"):
     with st.form("novo_cadastro", clear_on_submit=True):
         nome_n = st.text_input("Nome")
-        c1, c2 = st.columns(2)
-        whats_n = c1.text_input("Zap")
-        niver_n = c2.text_input("Data (DD/MM)")
+        whats_n = st.text_input("WhatsApp")
+        niver_n = st.text_input("Aniversário (Ex: 28/06)")
         gen_n = st.selectbox("Gênero", ["Feminino", "Masculino"])
         if st.form_submit_button("Cadastrar"):
             if nome_n and niver_n:
@@ -95,46 +109,54 @@ df_f = df_f[df_f['Nome'].str.contains(f_nome, case=False, na=False)]
 if f_mes_num != "Todos":
     df_f = df_f[df_f['Aniversario'].str.contains(f"/{f_mes_num}", na=False)]
 
-# --- LISTA ESTILIZADA ---
+# --- LISTA SUPER LEGÍVEL ---
 st.subheader(f"📋 {escolha_mes}")
 
 for idx, row in df_f.iterrows():
     icone, cor = ("🧔‍♂️", "#3498db") if row['Genero'] == "Masculino" else ("👗", "#e91e63")
     
-    # Nome e Data com fontes grandes
+    # Nome GIGANTE
     st.markdown(f"<div class='nome-membro'>{row['Nome']}</div>", unsafe_allow_html=True)
+    # Data e Ícone Grandes
     st.markdown(f"<div class='info-membro'>📅 {row['Aniversario']} | <span style='color:{cor}'>{icone}</span></div>", unsafe_allow_html=True)
     
-    # Botões Lado a Lado (4 colunas pequenas)
-    b1, b2, b3, b4 = st.columns([1, 1, 1, 1])
+    # Botões na mesma linha (4 colunas)
+    b1, b2, b3, b4 = st.columns(4)
     
-    l_a = gerar_link_agenda(row['Nome'], row['Aniversario'])
-    if l_a: b1.link_button("📅", l_a, help="Agenda")
-    
+    # WhatsApp
     l_w = limpar_whatsapp(row['WhatsApp'])
-    if l_w: b2.link_button("📱", l_w, help="WhatsApp")
+    if l_w: b1.link_button("📱", l_w)
     
+    # Agenda
+    l_a = gerar_link_agenda(row['Nome'], row['Aniversario'])
+    if l_a: b2.link_button("📅", l_a)
+    
+    # Editar
     if b3.button("📝", key=f"ed_{idx}"):
         st.session_state.edit_idx = idx
         st.rerun()
         
+    # Lixo
     if b4.button("🗑️", key=f"del_{idx}"):
         st.session_state.df_membros = st.session_state.df_membros.drop(idx).reset_index(drop=True)
         salvar_dados(st.session_state.df_membros)
         st.rerun()
     
-    st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr>", unsafe_allow_html=True)
 
 # --- EDIÇÃO ---
 if 'edit_idx' in st.session_state:
     idx = st.session_state.edit_idx
     m = st.session_state.df_membros.iloc[idx]
     with st.form("edit_form"):
+        st.write("### Editar Registro")
         en = st.text_input("Nome", m['Nome'])
+        ew = st.text_input("WhatsApp", m['WhatsApp'])
         ea = st.text_input("Data", m['Aniversario'])
         eg = st.selectbox("Gênero", ["Feminino", "Masculino"], index=0 if m['Genero'] == "Feminino" else 1)
         if st.form_submit_button("Salvar"):
             st.session_state.df_membros.at[idx, 'Nome'] = en
+            st.session_state.df_membros.at[idx, 'WhatsApp'] = ew
             st.session_state.df_membros.at[idx, 'Aniversario'] = ea
             st.session_state.df_membros.at[idx, 'Genero'] = eg
             salvar_dados(st.session_state.df_membros)
